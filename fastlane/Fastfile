@@ -1,0 +1,59 @@
+default_platform(:android)
+
+flavors = [
+    "appone",
+    "apptwo",
+    "appthree",
+    "appfour",
+    "appfive",
+]
+
+platform :android do
+  desc "Make AABs"
+  lane :make_aabs do
+    flavors.each { |flavor|
+        gradle(
+            task: 'bundle',
+            flavor: flavor,
+            build_type: 'Release'
+        )
+    }
+  end
+
+  desc "Upload screenshots to playstore"
+    lane :playstore_metadata do
+      flavors.each { |flavor|
+        supply(
+            package_name: 'com.dave.fastlanetest.' + flavor,
+            json_key: './fastlane/play-store-credentials.json',
+            metadata_path: 'fastlane/metadata/' + flavor,
+            version_code: 1
+        )
+      }
+  end
+
+  desc "Make Screenshot"
+  lane :screenshot do # fastlane에서 실행할 액션명입니다. ex) fastlane screenshot
+    flavors.each { |flavor|
+       gradle(task: "clean") # 1. Gradle을 초기화 합니다.
+       gradle( # 2. Gradle 빌드를 돌려서 테스트용 APK를 생성합니다.
+         task: 'assemble',
+         flavor: flavor,
+         build_type: 'Debug'
+       )
+       gradle( # 3. Gradle 테스트용 APK를 생성합니다.
+         task: 'assemble',
+         flavor: flavor,
+         build_type: 'DebugAndroidTest'
+       )
+       capture_android_screenshots( # 4. 테스트를 돌며, 스크린샷을 찍습니다.
+         app_package_name: 'com.dave.fastlanetest.' + flavor,
+         clear_previous_screenshots: true,
+         locales: ['en-US'],
+         output_directory: "fastlane/metadata/" + flavor,
+         app_apk_path: "app/build/outputs/apk/" + flavor + "debug/app-" + flavor + "-debug.apk",
+         tests_apk_path: "app/build/outputs/apk/androidTest/" + flavor + "/debug/app-" + flavor + "-debug-androidTest.apk"
+       )
+    }
+  end
+end
